@@ -183,6 +183,9 @@ class HX870(object):
         if radio_status != "00":
             raise TimeoutError("Radio not ready")
 
+    def set_progress_callback(self, callback):
+        self.progress_callback = callback
+
     def read_config_memory(self, offset, length):
         self.wait_for_ready()
         self.send("#CEPRD", ["%04X" % offset, "%02X" % length])
@@ -199,6 +202,8 @@ class HX870(object):
         config_data = b''
         for address in range(0x0000, 0x8000, 0x40):
             config_data += self.read_config_memory(address, 0x40)
+            if self.progress_callback and address & 0x03ff == 0:
+                self.progress_callback(address / 0x8000)
         return config_data
 
     def waypoints_read(self):
@@ -241,11 +246,15 @@ class HX870(object):
         self.write_config_memory(0x0010, data[0x0010:0x0040])
         for offset in range(0x0040, 0x7fc0, 0x40):
             self.write_config_memory(offset, data[offset:offset+0x40])
+            if self.progress_callback and offset & 0x03ff == 0:
+                self.progress_callback(offset / 0x8000)
         self.write_config_memory(0x7fc0, data[0x7fc0:0x7ffe])
 
     def read_mmsi(self):
         data = hexlify(self.read_config_memory(0x00b0, 6)).decode().upper()
         mmsi = data[0:10]
+        if mmsi[9] == "0":
+            mmsi = mmsi[:-1]
         status = data[10:12]
         return mmsi, status
 
