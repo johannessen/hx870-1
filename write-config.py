@@ -3,26 +3,38 @@
 
 import time, sys, os
 
-import pyhx870
+import hxtool
 
 
 def progress_bar(progress):
     sys.stdout.write(".")
     sys.stdout.flush()
 
+class HxToolArgs(object):
+    def __init__(self):
+        self.model = None
+        self.tty = None
+        self.simulator = None
+
 def config_write(config):
+    h = hxtool.get(HxToolArgs())
     try:
-        h = pyhx870.get()
-        h.init()
-        h.sync()
+        if not h.comm.cp_mode:
+            raise Exception("not in CP mode (region mismatch?)")
+        h.comm.sync()
+        fw = h.comm.get_firmware_version()
     except Exception as exc:
         print( "Could not open connection to HX870." )
         sys.exit(1)
-    print( "Firmware " + h.get_firmware_version() + " installed on device" )
+    print( "Firmware " + fw + " installed on device" )
     sys.stdout.write( "Writing to HX870 memory " )
     sys.stdout.flush()
-    h.set_progress_callback(progress_bar)
-    h.config_write(config)
+    try:
+        h.config.set_progress_callback(progress_bar)
+        config = h.config.config_write(config)
+    except Exception as exc:
+        print( " Error!" )
+        raise exc
     print( " done" )
 
 
