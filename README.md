@@ -1,10 +1,33 @@
-# HX870 phun with pyhx870
+# hxtool
 
 Here's my collection of experimental Python code and reverse engineering notes
-for hacking the Standard Horizon HX870 maritime radios.
+for hacking the Standard Horizon HX-style maritime radios by Yaesu. Currently supported
+are the *HX870* and *HX890* model series. The code also works on FT750-style aviation
+radios, which share the same hardware platform, to some degree as well, but that
+functionality is not exposed on the command line frontend, yet.
 
-The code is hardly documented and fully user-unfriendly and I am feeling
-slightly awful about it.
+## Disclaimer
+
+> **It is very easy to completely screw up your radio with low-level tooling like this,**
+> **so BE EXTREMELY CAREFUL and get help from your geek friend if you're out of your depth.**
+> **The software probably contains mistakes that can permanently damage your radio.**
+> **Although it has been used a lot on my personal radio, I cannot guarantee**
+> **that it works on yours. Use it AT YOUR OWN RISK!**
+
+## Installation
+
+**This software does not work with Python 2.7!** It produces just a cryptic error message.
+
+The code is hardly documented and largely user-unfriendly and I am feeling
+slightly awful about it. However, you may install the command line tool into your
+(preferably virtual) *Python 3.6+* environment via
+`pip install git+https://github.com/cr/hx870`. Then see `hxtool --help` for usage
+information.
+
+`hxtool` works on *Linux*, *Mac OS*, and *Windows 10* (and probably older ones, too) and it
+has been extensively tested with the HX870 radio without any ill effects when used appropriately.
+
+The HX890 portion has only been tested sporadically, and be mindful of the disclaimer above.
 
 ## Config DAT file dump format
 
@@ -14,6 +37,12 @@ It is still incomplete and currently only documented in form of a
 
 If you can C and figure out their custom lingo for defining bitfields, you'll have
 no trouble reading it.
+
+## Experimantal support for GPS log
+
+GPS logs can now be exported and erased. Supported output formats are GPX, JSON, and raw log bytes.
+`hxtool gpslog` should dump some log content to screen if radio is in programming mode.
+See `hxtool gpslog --help` for usage info.
 
 ## HX870 USB protocol
 
@@ -104,21 +133,31 @@ Checksum is XOR reduce over the raw bytes between $ and *.
 * `$PMTK251,115200*1F` - Sent to radio before GPS Log Transfer
 
 * `$PMTK183*38` - StatusLog, sent to radio
-* `$PMTKLOG,1,1,b,127,60,0,0,1,1,0*26` - Radio reply to StatusLog
-
+* `$PMTKLOG,FULL_STOP*3E` Interspersed warning by radio after log commands
+* `$PMTKLOG,8,1,b,127,5,0,0,1,1430,22*1B` - Radio reply to StatusLog
+  * `8`: number 4k flash pages used by log (expect to be transfered)
+  * `1`: unknown from raw log header offset 2
+  * `b`: unknown from raw log header offset 3
+  * `127`: unknown from raw log header offset 4
+  * `5`: logger interval (in seconds) when log was started
+  * `0`: unknown
+  * `0`: unknown
+  * `1`: unknown
+  * `1430`: number of log slots used (max. 6432)
+  * `22`: log usage percentage
+* `$PMTK001,183,3*3A` - Radio ACK of StatusLog
 * `$PMTK622,1*29` - ReadLog, sent to radio
-* `$PMTK001,183,3*3A` - Radio response after ReadLog
-* `$PMTKLOX,0,43*6E` - Radio response with data
+* `$PMTKLOX,0,43*6E` - Radio response with data, expect 43 `LOX,1` log lines
 * `$PMTKLOX,1,0,0100010B,7F000000,...,FFFFFFF*27` - Log data
 * `$PMTKLOX,1,1,FFFFFFFF,FFFFFFFF,...,FFFFFFF*59` - Log data
 * `$PMTKLOX,1,2,FFFFFFFF,FFFFFFFF,...,FFFFFFF*5A` - Log data
 * `...`
 * `$PMTKLOX,1,42,FFFFFFFF,FFFFFFFF,...,FFFFFFF*6E` - Log data
-* `$PMTKLOX,2*47` - From radio after log data
-* `$PMTK001,622,3*36` - From radio after log data
+* `$PMTKLOX,2*47` - From radio, end of log
+* `$PMTK001,622,3*36` - Radio ACK of ReadLog
 
 * `$PMTK184,1*22` - EraseLog
-* `$PMTK001,184,3*3D` - Radio reply after EraseLog
+* `$PMTK001,184,3*3D` - Radio ACK EraseLog
 
 * `$PMTK...` - numArray
 * `$PMTK0..$PMTK8`
@@ -126,18 +165,18 @@ Checksum is XOR reduce over the raw bytes between $ and *.
 
 #### `$PMTK` sentences appearing in firmware 02.03:
 
-* `PMTK183*`
-* `PMTK184,0*`
-* `PMTK185,1*`
-* `PMTK186,1*`
-* `PMTK187,1,1*`
-* `PMTK225,0*`
-* `PMTK251,0*`
-* `PMTK301,0*`
-* `PMTK313,0*`
-* `PMTK386,0*`
-* `PMTK605*`
-* `PMTK622,0*`
+* `PMTK183*`  Query logging status
+* `PMTK184,0*`  Erase logger flash
+* `PMTK185,1*`  Stop logging data
+* `PMTK186,1*`  Snapshot write log
+* `PMTK187,1,1*`  Configure Locus setting, interval mode 1s
+* `PMTK225,0*`  Set periodic power saving mode, normal mode
+* `PMTK251,0*`  Set NMEA baud rate, default
+* `PMTK301,0*`  Set DGPS correction source, none
+* `PMTK313,0*`  Enable or disable SBAS search
+* `PMTK386,0*`  Set speed threshold for static navigation
+* `PMTK605*`  Query firmware release information
+* `PMTK622,0*`  Dump Locus flash data
 
 
 #### Strings appearing in YCE01 firmware flasher
@@ -154,3 +193,14 @@ After factory reset, the following values are present at offset 0x0110 in config
 `17 12 26 18  53 52 18 88  80 4E 00 06  11 76 21 45`
 
 After a full reboot, those values are replaced by all FF.
+
+## Testing notes
+
+ - `pytest -v` - running the test suite
+ - `pytest --cov=hxtool --cov-report=term` - running test coverage
+
+# Documentation
+
+ - https://www.telit.com/wp-content/uploads/2018/03/1VV0301162_V13_Software_User_Guide_r4.pdf
+ - https://cdn-shop.adafruit.com/datasheets/PMTK+command+packet-Complete-C39-A01.pdf
+ - https://cdn-shop.adafruit.com/datasheets/GTop+LOCUS+Library+User+Manual-v13.pdf

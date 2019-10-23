@@ -2,33 +2,30 @@
 
 from setuptools import setup, find_packages
 
-PACKAGE_NAME = 'pyhx870'
-PACKAGE_VERSION = '0.1.0a'
+PACKAGE_NAME = 'hxtool'
+PACKAGE_VERSION = '0.3.0a4'
 
 INSTALL_REQUIRES = [
     'coloredlogs',
+    'gpxpy',
     'ipython',
-    'pyserial',
-    'pyusb'
+    'pyserial'
 ]
 
 TESTS_REQUIRE = [
     'coverage',
-    'mock',
-    'pytest'
+    'pycodestyle',
+    'pytest',
+    'pytest-pycodestyle',
+    'pytest-runner'
 ]
 
-DEV_REQUIRES = [
-    'coverage',
-    'mock',
-    'pycodestyle',
-    'pytest'
-]
+DEV_REQUIRES = TESTS_REQUIRE
 
 setup(
     name=PACKAGE_NAME,
     version=PACKAGE_VERSION,
-    description='Tool for Yaesu HX870 flashing and configuration',
+    description='Tool for Yaesu / Stadard Horizon HX series radio flashing and configuration',
     classifiers=[
         'Environment :: Console',
         'Development Status :: 3 - Alpha',
@@ -38,14 +35,16 @@ setup(
         'Natural Language :: English',
         'Operating System :: MacOS :: MacOS X',
         'Operating System :: POSIX :: Linux',
+        'Operating System :: Microsoft :: Windows :: Windows 10',
         'Programming Language :: Python :: 3 :: Only',
         'Topic :: Communications :: Ham Radio'
     ],
-    keywords=['hamradio', 'radio', 'maritime', 'yaesu', 'standard horizon', 'hx870', 'hx870e', 'firmware', 'flashing'],
+    keywords=['hamradio', 'radio', 'maritime', 'yaesu', 'standard horizon', 'hx870', 'hx870e',
+              'hx890', 'hx890e', 'firmware', 'flashing', 'mmsi', 'atis'],
     author='Christiane Ruetten',
     author_email='cr@23bit.net',
     url='https://github.com/cr/pyhx870',
-    download_url='https://github.com/cr/pyhx870/archive/latest.tar.gz',
+    download_url='https://github.com/cr/pyhx870/archive/master.tar.gz',
     license='GPLv3',
     packages=find_packages(exclude=["tests"]),
     include_package_data=True,  # See MANIFEST.in
@@ -54,10 +53,9 @@ setup(
     install_requires=INSTALL_REQUIRES,
     tests_require=TESTS_REQUIRE,
     extras_require={'dev': DEV_REQUIRES},  # For `pip install -e .[dev]`
-    test_suite='nose.collector',
     entry_points={
         'console_scripts': [
-            'hx870 = pyhx870.main:main'
+            'hxtool = hxtool.main:main'
         ]
     }
 )

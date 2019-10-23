@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 
-import logging
-import time
+from logging import getLogger
+from time import sleep
 
+import hxtool
 from .base import CliCommand
-import pyhx870
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
 class NmeaCommand(CliCommand):
@@ -15,11 +15,11 @@ class NmeaCommand(CliCommand):
     help = "dump NMEA live data"
 
     def run(self):
-        hx = pyhx870.get(self.args)
+
+        hx = hxtool.get(self.args)
         if hx is None:
-            logger.error("No HX870 connected")
             return 10
-        hx.init()
+
         if hx.cp_mode:
             logger.error("Handset in CP mode, reboot to regular mode")
             return 10
@@ -32,10 +32,11 @@ class NmeaCommand(CliCommand):
 
 def nmea_dump(h):
     while True:
-        if h.available() > 0:
-            yield h.read_line().decode("ascii").rstrip("\r\n")
+        if h.comm.available() > 0:
+            yield h.comm.read_line().decode("ascii").rstrip("\r\n")
         else:
-            time.sleep(0.02)
+            sleep(0.02)
+
 
 def print_nmea(h):
     for l in nmea_dump(h):

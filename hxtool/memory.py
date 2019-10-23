@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 
 from binascii import hexlify, unhexlify
-import logging
+import datetime
+from functools import reduce
+from logging import getLogger
 from re import match
+from struct import unpack
 
 from . import protocol
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
 
 
 def unpack_waypoint(data):
@@ -67,6 +70,30 @@ def pack_waypoint(wp):
         raise protocol.ProtocolError("Waypoint encoding error")
 
     return wp_data
+
+
+def unpack_log_line(data: bytes):
+    if len(data) != 20 or data[:4] == "\xff\xff\xff\xff":
+        raise protocol.ProtocolError(f"Invalid log line data: {hexlify(data).decode('ascii')}")
+
+    timestamp, tz_code, latitude, longitude, elevation, speed, heading, checksum = unpack("<IBffhhhB", data)
+
+    chk = reduce(lambda x, y: x ^ y, data[:-1])
+    if chk != checksum:
+        raise protocol.ProtocolError(f"Log line checksum error: {hexlify(data).decode('ascii')}, expected {hex(chk)}")
+
+    # tz_code is 02 if log was captured in UTC mode, 04 if localtime mode.
+    # However, timezone offset is not stored anywhere in log and timestamp is always UTC.
+
+    return {
+        "utc_time": datetime.datetime.utcfromtimestamp(timestamp),
+        "tz_code": tz_code,
+        "latitude": latitude,
+        "longitude": longitude,
+        "elevation": elevation,  # meters
+        "speed": speed,  # meters per second
+        "heading": heading
+    }
 
 # Snippets for waypoint export
 # m = re.match(r"""(\d+)([NSEW])(\d+\.\d+)""", '13N8.194')

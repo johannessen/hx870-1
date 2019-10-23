@@ -1,8 +1,11 @@
 *.pyc
-HX870
+dumps
 doc
 .idea
 *.egg-info
 venv
 Pipfile
 Pipfile.lock
+.coverage
+htmlcov
+.DS_Store
